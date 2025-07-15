@@ -35,7 +35,9 @@ class AStarPlanner:
 
     @staticmethod
     def heuristic(current, goal):
-        return np.sqrt(np.sum((np.array(current.position) - np.array(goal.position))**2))
+        return np.sqrt(
+            np.sum((np.array(current.position) - np.array(goal.position)) ** 2)
+        )
 
     def astar(self):
         # Set up the open and closed sets
@@ -173,8 +175,7 @@ for i in range(20, 25):
 obstacles.append((0, 0, 0))
 obstacles.append((30, 30, 30))
 
-planner = AStarPlanner(grid_width, grid_height,
-                       grid_depth, start, goal, obstacles)
+planner = AStarPlanner(grid_width, grid_height, grid_depth, start, goal, obstacles)
 planner.create_grid()
 planner.astar()
 planner.plot_grid()

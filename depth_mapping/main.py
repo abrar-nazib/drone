@@ -2,12 +2,28 @@ import cv2
 import torch
 import time
 import numpy as np
+from environs import Env
+import os
 
+CURRENT_FILE_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT_DIR = os.path.dirname(CURRENT_FILE_DIR)
+ENV_FILE_PATH = os.path.join(ROOT_DIR, ".env")
 
+# Load environment variables from .env file
+env = Env()
+env.read_env(ENV_FILE_PATH)
+
+STREAM_URL = env.str("RASPI_IP", "0")
+if STREAM_URL == "0":
+    STREAM_URL = 0
+else:
+    STREAM_URL = f"http://{STREAM_URL}:7123/stream.mjpg"
 
 # Load a MiDas model for depth estimation
 # model_type = "DPT_Large"     # MiDaS v3 - Large     (highest accuracy, slowest inference speed)
-model_type = "DPT_Hybrid"   # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
+model_type = (
+    "DPT_Hybrid"  # MiDaS v3 - Hybrid    (medium accuracy, medium inference speed)
+)
 # model_type = "MiDaS_small"  # MiDaS v2.1 - Small   (lowest accuracy, highest inference speed)
 
 midas = torch.hub.load("intel-isl/MiDaS", model_type)
@@ -27,11 +43,19 @@ else:
 
 
 # Open up the video capture from a webcam
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(STREAM_URL)
 
 while cap.isOpened():
 
-    success, img = cap.read()
+    imgs = []
+    for _ in range(5):
+        success, img = cap.read()
+        if not success:
+            break
+        imgs.append(img)
+    if len(imgs) == 0:
+        break
+    img = imgs[-1]  # Use the last frame for processing
 
     start = time.time()
 
@@ -53,8 +77,9 @@ while cap.isOpened():
 
     depth_map = prediction.cpu().numpy()
 
-    depth_map = cv2.normalize(depth_map, None, 0, 1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_64F)
-
+    depth_map = cv2.normalize(
+        depth_map, None, 0, 1, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_64F
+    )
 
     end = time.time()
     totalTime = end - start
@@ -63,12 +88,12 @@ while cap.isOpened():
 
     img = cv2.cvtColor(img, cv2.COLOR_RGB2BGR)
 
-    depth_map = (depth_map*255).astype(np.uint8)
-    depth_map = cv2.applyColorMap(depth_map , cv2.COLORMAP_MAGMA)
+    depth_map = (depth_map * 255).astype(np.uint8)
+    depth_map = cv2.applyColorMap(depth_map, cv2.COLORMAP_MAGMA)
 
     # cv2.putText(img, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,255,0), 2)
-    cv2.imshow('Image', img)
-    cv2.imshow('Depth Map', depth_map)
+    cv2.imshow("Image", img)
+    cv2.imshow("Depth Map", depth_map)
 
     if cv2.waitKey(5) & 0xFF == 27:
         break
